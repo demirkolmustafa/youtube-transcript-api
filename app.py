@@ -1,11 +1,13 @@
+import os
 from flask import Flask, request, jsonify
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def home():
-    return "YouTube Transcript API is running!"
+    return "YouTube Transcript API (with Proxy) is running!"
 
 @app.route('/transcript', methods=['GET'])
 def get_transcript():
@@ -15,18 +17,23 @@ def get_transcript():
         return jsonify({"error": "Please provide a video_id"}), 400
 
     try:
-        # --- NEW 2025 API SYNTAX ---
-        # 1. Instantiate the API Class
-        yt = YouTubeTranscriptApi()
+        # 1. Get secrets from Render Environment
+        proxy_user = os.environ.get('hvwvozst')
+        proxy_pass = os.environ.get('7c7y0oq184rx')
+
+        # 2. Configure Proxy (if credentials exist)
+        if proxy_user and proxy_pass:
+            proxy_config = WebshareProxyConfig(proxy_user, proxy_pass)
+            yt = YouTubeTranscriptApi(proxy_config=proxy_config)
+        else:
+            # Fallback to no proxy (will likely fail on Render)
+            yt = YouTubeTranscriptApi()
         
-        # 2. Fetch the transcript (Returns an object, not a list)
+        # 3. Fetch Transcript
         transcript_obj = yt.fetch(video_id)
-        
-        # 3. Convert it to the raw list of text
         transcript_list = transcript_obj.to_raw_data()
-        # ---------------------------
         
-        # Combine the text parts
+        # 4. Combine text
         full_text = " ".join([entry['text'] for entry in transcript_list])
         
         return jsonify({
